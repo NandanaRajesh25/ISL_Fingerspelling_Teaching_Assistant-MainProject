@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-**Sign & Spell** is a full-stack web application designed for young deaf students and sign language learners. It bridges the gap between sign language hand gestures and literacy by:
+**SignSync** is a full-stack web application designed for young deaf students and sign language learners. It bridges the gap between sign language hand gestures and literacy by:
 
 - 🎥 Capturing **live webcam frames** in the browser
 - 🧠 Running inference on a **MobileViT** model (via a Python backend)
