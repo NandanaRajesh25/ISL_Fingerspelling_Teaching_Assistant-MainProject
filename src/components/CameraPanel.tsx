@@ -1,5 +1,5 @@
-import { Camera, Keyboard } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { Camera, Keyboard, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
 import { DetectionStatus } from '@/hooks/useSignDetection';
 
 interface CameraPanelProps {
@@ -34,31 +34,39 @@ const CameraPanel = ({
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Camera Feed + Detection Status (unified) */}
-      <div className="relative min-h-[480px] bg-camera rounded-2xl border-2 border-camera-border overflow-hidden shadow-soft flex flex-col">
-        {/* Status Header */}
-        <div className="flex items-center gap-2 px-2 py-1.5 bg-card/80 backdrop-blur-sm border-b border-border flex-shrink-0">
-          <div 
+    <div className="flex flex-col gap-2.5">
+      {/* Camera Feed Card */}
+      <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+        {/* Status bar */}
+        <div className="flex items-center gap-2.5 px-3 py-2 border-b border-border bg-muted/40">
+          <div
             className={`
-              w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300
-              ${currentLetter ? 'bg-primary shadow-glow animate-celebrate' : 'bg-muted'}
+              w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300 font-bold text-sm
+              ${currentLetter
+                ? 'bg-primary text-primary-foreground shadow-glow animate-celebrate'
+                : 'bg-muted text-muted-foreground'
+              }
             `}
           >
-            <span className={`text-xs font-extrabold ${currentLetter ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
-              {currentLetter || '?'}
-            </span>
+            {currentLetter || '–'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-xs font-bold transition-colors truncate ${status === 'detected' ? 'text-success' : 'text-foreground'}`}>
+            <p className={`text-xs font-semibold truncate transition-colors ${status === 'detected' ? 'text-success' : 'text-foreground'}`}>
               {statusMessage}
             </p>
-            {status === 'idle' && <p className="text-[10px] text-muted-foreground">Make a hand sign in front of the camera</p>}
+            {status === 'idle' && (
+              <p className="text-[10px] text-muted-foreground leading-tight">Make a hand sign in front of the camera</p>
+            )}
           </div>
+          {remainingTime > 0 && (
+            <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md flex-shrink-0">
+              {remainingTime}s
+            </span>
+          )}
         </div>
 
         {/* Camera area */}
-        <div className="flex-1 flex flex-col items-center justify-center relative">
+        <div className="relative bg-camera" style={{ aspectRatio: '4/3' }}>
           {videoRef ? (
             <>
               <video
@@ -69,78 +77,72 @@ const CameraPanel = ({
                 className="w-full h-full object-cover"
               />
               
-              {/* Overlay info */}
-              <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm rounded-lg p-2 text-white">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <span className="text-xs font-medium">
-                      {isConnected ? 'Connected' : 'Disconnected'}
-                    </span>
+              {/* HUD overlay */}
+              <div className="absolute bottom-2 left-2 right-2">
+                <div className="bg-black/55 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <span className="text-[11px] font-medium">{isConnected ? 'Connected' : 'Disconnected'}</span>
                   </div>
-                  {remainingTime > 0 && (
-                    <span className="text-xs font-bold">
-                      Next letter in: {remainingTime}s
-                    </span>
+                  {stablePrediction && stablePrediction !== 'nothing' && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-white/70">Detecting:</span>
+                      <span className="text-sm font-bold">{stablePrediction.toUpperCase()}</span>
+                      <span className="text-[10px] text-white/60">({stableCount}/8)</span>
+                    </div>
                   )}
                 </div>
-                
-                {stablePrediction && stablePrediction !== 'nothing' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px]">Detecting:</span>
-                    <span className="text-base font-bold">{stablePrediction.toUpperCase()}</span>
-                    <span className="text-[10px]">({stableCount}/8)</span>
-                  </div>
-                )}
               </div>
             </>
           ) : (
-            <>
-              <div className="w-10 h-10 rounded-full bg-accent/30 flex items-center justify-center mb-2 animate-pulse-soft">
-                <Camera className="w-5 h-5 text-accent-foreground" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-white/30" />
               </div>
-              <p className="text-xs font-semibold text-foreground/60">Camera Feed</p>
-              <p className="text-[10px] text-muted-foreground mt-1">Your video will appear here</p>
-            </>
+              <p className="text-xs font-medium text-white/40">Camera feed</p>
+              <p className="text-[10px] text-white/25">Start camera to begin detection</p>
+            </div>
+          )}
+
+          {status === 'detecting' && (
+            <div className="absolute inset-0 border-2 border-primary rounded-xl animate-pulse-soft pointer-events-none" />
           )}
         </div>
-
-        {status === 'detecting' && (
-          <div className="absolute inset-0 border-2 border-primary rounded-2xl animate-pulse-soft" />
-        )}
       </div>
 
-      {/* Mock Keyboard for Testing */}
-      <div className="bg-card rounded-2xl p-2 shadow-soft border border-border flex-shrink-0">
+      {/* Test Keyboard */}
+      <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
         <button
           onClick={() => setShowKeyboard(!showKeyboard)}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-1"
+          className="w-full flex items-center justify-between px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          <Keyboard className="w-3 h-3" />
-          <span className="text-[10px] font-medium">
-            {showKeyboard ? 'Hide Test Keyboard' : 'Show Test Keyboard'}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <Keyboard className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Test Keyboard</span>
+          </div>
+          {showKeyboard ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
         {showKeyboard && (
-          <div className="grid grid-cols-9 gap-1">
-            {alphabet.map((letter) => (
-              <button
-                key={letter}
-                onClick={() => handleKeyPress(letter)}
-                className="
-                  w-6 h-6 rounded-lg
-                  bg-secondary text-secondary-foreground
-                  font-bold text-xs
-                  hover:bg-primary hover:text-primary-foreground
-                  hover:scale-110 active:scale-95
-                  transition-all duration-150
-                  shadow-sm
-                "
-              >
-                {letter}
-              </button>
-            ))}
+          <div className="px-2.5 pb-2.5 border-t border-border">
+            <div className="grid grid-cols-9 gap-1 mt-2">
+              {alphabet.map((letter) => (
+                <button
+                  key={letter}
+                  onClick={() => handleKeyPress(letter)}
+                  className="
+                    w-full aspect-square rounded-md
+                    bg-muted text-foreground
+                    font-bold text-xs
+                    hover:bg-primary hover:text-primary-foreground
+                    hover:scale-105 active:scale-95
+                    transition-all duration-150
+                  "
+                >
+                  {letter}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -1,73 +1,789 @@
-# Welcome to your Lovable project
+# 🤟 Sign & Spell — Real-Time ISL Hand Sign Detection & Spelling Game
 
-## Project info
+> A child-friendly, interactive sign language learning tool that uses a **MobileViT deep learning model** and a real-time **WebSocket pipeline** to detect Indian Sign Language (ISL) hand signs via webcam, build words letter-by-letter, and check spelling — all in the browser.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## 📖 Table of Contents
 
-There are several ways of editing your application.
+1. [Project Overview](#project-overview)
+2. [Key Features](#key-features)
+3. [System Architecture](#system-architecture)
+4. [Technology Stack](#technology-stack)
+5. [Project Structure](#project-structure)
+6. [Prerequisites](#prerequisites)
+7. [Installation & Setup](#installation--setup)
+8. [Running the Application](#running-the-application)
+9. [How to Use](#how-to-use)
+10. [Detection Parameters & Configuration](#detection-parameters--configuration)
+11. [Model Details](#model-details)
+12. [Supported Hand Signs & Dictionary](#supported-hand-signs--dictionary)
+13. [Frontend Components](#frontend-components)
+14. [Backend API Reference](#backend-api-reference)
+15. [Test Mode (No Backend Required)](#test-mode-no-backend-required)
+16. [Troubleshooting](#troubleshooting)
+17. [Security Notes](#security-notes)
+18. [Dependencies](#dependencies)
+19. [License](#license)
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Project Overview
 
-Changes made via Lovable will be committed automatically to this repo.
+**Sign & Spell** is a full-stack web application designed for young deaf students and sign language learners. It bridges the gap between sign language hand gestures and literacy by:
 
-**Use your preferred IDE**
+- 🎥 Capturing **live webcam frames** in the browser
+- 🧠 Running inference on a **MobileViT** model (via a Python backend)
+- 📡 Communicating in **real time** over WebSocket
+- 🔤 Building words **letter by letter** from detected hand signs
+- ✅ Checking spelling and offering **corrected word suggestions**
+- 🎞️ Playing **ISL sign videos** for each letter or full word
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+The application is built specifically with children in mind — featuring clear visual feedback, celebratory animations, and a forgiving detection pipeline that prevents accidental letter inputs.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## Key Features
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+| Feature | Description |
+|---|---|
+| 🎥 Real-time webcam detection | Live video captured at 5 fps (every 200 ms), streamed to backend |
+| 🧠 MobileViT-S model | Lightweight vision transformer trained on 28 ISL classes |
+| 📡 WebSocket communication | Low-latency bidirectional channel between browser and Python server |
+| 🔒 Stability filter | Letter is only accepted after **8 consecutive matching frames** |
+| ⏱️ Cooldown timer | **10-second cooldown** between accepted letters to pace the user |
+| 🗑️ Delete gesture | `del` sign removes the last typed letter |
+| ✅ Spell checker | Built-in dictionary of 50+ child-friendly words |
+| 💡 Fuzzy suggestions | Levenshtein distance finds the closest matching dictionary word |
+| 🎞️ Sign video viewer | Watch ISL videos for each letter or the whole word |
+| ⌨️ Test keyboard | Use the on-screen keyboard when backend is not running |
+| 📱 Responsive layout | Works on desktop and tablet-sized screens |
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Browser (React App)                          │
+│                                                                     │
+│  ┌──────────────────┐          ┌──────────────────────────────────┐ │
+│  │   CameraPanel    │          │         WordBuilder              │ │
+│  │  (Live Video)    │          │  (Letters, Spell Check, Result)  │ │
+│  └────────┬─────────┘          └──────────────────────────────────┘ │
+│           │                                                         │
+│  ┌────────▼──────────────────────────────────────────┐             │
+│  │             useSignDetection (React Hook)          │             │
+│  │  • getUserMedia → webcam stream                    │             │
+│  │  • Canvas frame capture every 200ms               │             │
+│  │  • Converts frame to base64 JPEG                  │             │
+│  │  • Sends via WebSocket                            │             │
+│  │  • Receives prediction + metadata                 │             │
+│  └────────────────────────┬──────────────────────────┘             │
+└───────────────────────────│─────────────────────────────────────────┘
+                            │  WebSocket  ws://localhost:8000/ws/detect
+┌───────────────────────────│─────────────────────────────────────────┐
+│                  Python Backend (FastAPI + Uvicorn)                  │
+│                                                                     │
+│  ┌────────────────────────▼──────────────────────────┐             │
+│  │              WebSocket Endpoint /ws/detect         │             │
+│  │  • Decodes base64 image                            │             │
+│  │  • Runs MobileViT inference                       │             │
+│  │  • Applies 8-frame stability filter               │             │
+│  │  • Enforces 10-second cooldown                    │             │
+│  │  • Returns: prediction, confidence, timing data   │             │
+│  └────────────────────────────────────────────────────┘             │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────┐           │
+│  │              MobileViT-S (PyTorch + timm)           │           │
+│  │  Input: 224×224 RGB image                           │           │
+│  │  Output: 28-class softmax probabilities             │           │
+│  │  Classes: a-z + del + nothing                       │           │
+│  └─────────────────────────────────────────────────────┘           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Communication flow (per frame):**
+
+```
+Browser captures frame
+  → Draw webcam to <canvas> (640×480)
+  → canvas.toDataURL('image/jpeg', 0.8) → base64 string
+  → WebSocket.send({ type: 'frame', data: '<base64>' })
+  → Backend decodes & runs model inference
+  → Returns { prediction, confidence, stable_count, remaining_time, should_accept, ... }
+  → Frontend updates UI + adds letter if should_accept === true
+```
+
+---
+
+## Technology Stack
+
+### Frontend
+| Technology | Version | Purpose |
+|---|---|---|
+| React | 18.3.x | UI framework |
+| TypeScript | 5.8.x | Type-safe JavaScript |
+| Vite | 5.4.x | Build tool & dev server |
+| Tailwind CSS | 3.4.x | Utility-first styling |
+| shadcn/ui + Radix UI | Latest | Accessible component primitives |
+| Lucide React | 0.462.x | Icon set |
+| React Router DOM | 6.30.x | Client-side routing |
+| react-helmet-async | 2.0.x | Document head management (SEO) |
+| TanStack Query | 5.83.x | Async state management |
+
+### Backend
+| Technology | Version | Purpose |
+|---|---|---|
+| Python | 3.8+ | Runtime |
+| FastAPI | 0.115.x | Async web framework |
+| Uvicorn | 0.34.x | ASGI web server |
+| PyTorch | 2.5.1 | Deep learning framework |
+| timm | 1.0.11 | Model zoo (MobileViT) |
+| torchvision | 0.20.1 | Image transforms |
+| Pillow | 11.1.x | Image decoding |
+| OpenCV | 4.10.x | Camera utilities (standalone script) |
+| NumPy | 2.2.x | Numerical operations |
+| websockets | 13.1 | WebSocket protocol support |
+
+---
+
+## Project Structure
+
+```
+remix-of-remix-of-sign-spell-fun/
+│
+├── 📄 README.md                    # This file
+├── 📄 QUICK_START.md               # One-page cheat sheet
+├── 📄 SETUP_GUIDE.md               # Detailed integration guide
+│
+├── 🐍 backend_server.py            # FastAPI WebSocket server (main backend)
+├── 🐍 run_mobilVit_camera.py       # Standalone camera test script (no web UI)
+├── 📄 requirements.txt             # Python dependencies
+├── 🔐 mobilevit_epoch_5.pth        # MobileViT model weights (~19 MB)
+├── 📄 class_order.txt              # 28 class labels for the model
+│
+├── ⚡ start_backend.ps1            # Windows PowerShell: starts Python server
+├── ⚡ start_frontend.ps1           # Windows PowerShell: starts Vite dev server
+├── 🐧 start_backend.sh             # Unix/macOS Bash: starts Python server
+│
+├── 📄 package.json                 # Node.js dependencies & scripts
+├── 📄 bun.lockb                    # Bun lockfile
+├── 📄 vite.config.ts               # Vite configuration
+├── 📄 tailwind.config.ts           # Tailwind CSS configuration
+├── 📄 tsconfig.json                # TypeScript root config
+├── 📄 tsconfig.app.json            # TypeScript app config
+├── 📄 tsconfig.node.json           # TypeScript node config
+├── 📄 components.json              # shadcn/ui config
+├── 📄 eslint.config.js             # ESLint configuration
+├── 📄 postcss.config.js            # PostCSS config (used by Tailwind)
+│
+├── 📁 public/
+│   ├── favicon.ico
+│   ├── robots.txt
+│   └── 📁 isl_videos/
+│       ├── 📁 words/               # Word-level ISL videos (e.g. CAT.mp4)
+│       └── 📁 letters/             # Letter-level ISL videos (e.g. A.mp4)
+│
+└── 📁 src/
+    ├── main.tsx                    # React entry point
+    ├── App.tsx                     # Root component (Router, QueryClient, Toaster)
+    ├── App.css                     # Root-level styles
+    ├── index.css                   # Tailwind directives + CSS custom properties
+    ├── vite-env.d.ts               # Vite type declarations
+    │
+    ├── 📁 pages/
+    │   ├── Index.tsx               # Main app page (orchestrates all panels)
+    │   └── NotFound.tsx            # 404 page
+    │
+    ├── 📁 components/
+    │   ├── CameraPanel.tsx         # Webcam feed, detection overlay, test keyboard
+    │   ├── WordBuilder.tsx         # Displays accumulated letters + action buttons
+    │   ├── LetterBubble.tsx        # Animated letter chip shown in WordBuilder
+    │   ├── ResultDisplay.tsx       # Shows correct / incorrect result + suggestions
+    │   ├── SignViewer.tsx          # Modal for playing ISL sign videos
+    │   ├── NavLink.tsx             # Navigation link helper
+    │   └── 📁 ui/                  # shadcn/ui primitives (Button, Dialog, etc.)
+    │
+    ├── 📁 hooks/
+    │   ├── useSignDetection.ts     # WebSocket + webcam management hook
+    │   ├── useWordBuilder.ts       # Word state, spell-check, Levenshtein hook
+    │   ├── use-mobile.tsx          # Responsive breakpoint hook
+    │   └── use-toast.ts            # Toast notification hook
+    │
+    └── 📁 lib/
+        └── utils.ts                # Tailwind class merging utilities
+```
+
+---
+
+## Prerequisites
+
+### Backend
+- **Python 3.8 or higher** (3.9 / 3.10 recommended)
+- **pip** package manager
+- **CUDA-compatible GPU** *(optional — CPU fallback is automatic)*
+- Required files in the project root:
+  - `mobilevit_epoch_5.pth` — model weights
+  - `class_order.txt` — 28 class label names
+
+### Frontend
+- **Node.js 16 or higher** (18+ recommended) **OR** [Bun](https://bun.sh/)
+- **npm** (bundled with Node.js) or **bun**
+- A modern web browser with **webcam access** (Chrome or Firefox recommended)
+
+---
+
+## Installation & Setup
+
+### Step 1 — Clone the repository
+
+```bash
 git clone <YOUR_GIT_URL>
+cd remix-of-remix-of-sign-spell-fun
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Step 2 — Backend: Install Python dependencies
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+pip install -r requirements.txt
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+This installs:
+- `fastapi`, `uvicorn[standard]`, `websockets`
+- `torch`, `torchvision`, `timm`
+- `opencv-python`, `Pillow`, `numpy`
+- `python-multipart`
+
+> 💡 **GPU acceleration**: If you have an NVIDIA GPU with CUDA, PyTorch will automatically use it. No extra configuration required.
+
+### Step 3 — Verify model files exist
+
+Confirm these two files are present in the project root:
+
+```
+✅ mobilevit_epoch_5.pth   (~19 MB — model weights)
+✅ class_order.txt         (28 class labels: a-z, del, nothing)
+```
+
+### Step 4 — Frontend: Install Node dependencies
+
+```bash
+npm install
+# or if using bun:
+bun install
+```
+
+---
+
+## Running the Application
+
+The application requires **two terminal sessions** running simultaneously.
+
+### Option A — PowerShell Scripts (Windows, recommended)
+
+**Terminal 1 — Backend:**
+```powershell
+.\start_backend.ps1
+```
+The script auto-checks for missing Python packages and installs them if needed.
+
+**Terminal 2 — Frontend:**
+```powershell
+.\start_frontend.ps1
+```
+
+### Option B — Bash Scripts (macOS / Linux)
+
+**Terminal 1 — Backend:**
+```bash
+bash start_backend.sh
+```
+
+**Terminal 2 — Frontend:**
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Option C — Manual Commands
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Terminal 1 — Backend:**
+```bash
+python backend_server.py
+```
+Wait until you see:
+```
+✅ Model loaded successfully!
+🚀 Starting server on http://localhost:8000
+```
 
-**Use GitHub Codespaces**
+**Terminal 2 — Frontend:**
+```bash
+npm run dev
+```
+Open your browser to the URL shown (usually `http://localhost:5173`).
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Ports
 
-## What technologies are used for this project?
+| Service | Default Port | URL |
+|---|---|---|
+| Python Backend (FastAPI) | `8000` | `http://localhost:8000` |
+| Frontend (Vite dev server) | `5173` | `http://localhost:5173` |
+| WebSocket endpoint | `8000` | `ws://localhost:8000/ws/detect` |
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## How to Use
 
-## How can I deploy this project?
+### Step-by-Step Walkthrough
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+1. **Open the app** in your browser at `http://localhost:5173`
 
-## Can I connect a custom domain to my Lovable project?
+2. **Start Camera Detection**
+   - Click the **"🎥 Start Camera Detection"** button in the header
+   - Grant camera permissions when the browser prompts you
+   - You'll see your live webcam feed on the **left panel**
+   - The status indicator will turn **green ("Live")**
 
-Yes, you can!
+3. **Sign a letter**
+   - Position your hand clearly in front of the camera
+   - The model reads your sign continuously at 5 fps
+   - Watch the **"Detecting: X (n/8)"** overlay at the bottom of the video
+   - Hold your sign steady until the count reaches **8/8**
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+4. **Wait for the cooldown**
+   - After each accepted letter, a **10-second cooldown** starts
+   - The countdown is displayed in real time: **"Next letter in: Ns"**
+   - This prevents accidental double-entry
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+5. **Build your word**
+   - Letters appear one by one in the **"Building Your Word"** area on the right
+   - Use the **`del` hand sign** to remove the last letter
+   - Or click the **"Undo"** button for the same effect
+   - Click **"Clear"** to start a new word
+
+6. **Check your spelling**
+   - Click the **"Done ✅"** button when your word is complete
+   - If correct: 🎉 **"Amazing Job!"** with a green celebration animation
+   - If incorrect: 🤔 **"Almost There!"** with the closest dictionary suggestion
+
+7. **View sign videos**
+   - After a correct word: click **"Show Sign"** to watch the full word ISL video
+   - After a suggestion: click **"Show Signs"** to watch each letter's ISL video one by one, with forward/back navigation
+
+8. **Try again**
+   - Click **"Try Another"** or **"Try Again"** to reset and build a new word
+
+---
+
+## Detection Parameters & Configuration
+
+### Backend (`backend_server.py`)
+
+```python
+PRED_INTERVAL    = 10   # Seconds between accepting letters
+STABILITY_FRAMES = 8    # Consecutive matching frames required
+NUM_CLASSES      = 28   # Total classes (a-z + del + nothing)
+MODEL_PATH       = "mobilevit_epoch_5.pth"
+CLASS_FILE       = "class_order.txt"
+```
+
+### Frontend (`src/hooks/useSignDetection.ts`)
+
+```typescript
+const WS_URL        = 'ws://localhost:8000/ws/detect';
+const FRAME_INTERVAL = 200;  // milliseconds between frame sends (5 fps)
+```
+
+### Canvas Resolution
+
+Each captured frame is sent at **640×480** pixels before being resized to **224×224** by the backend transform pipeline.
+
+### Stability Algorithm
+
+The backend maintains a **sliding window deque** of the last `STABILITY_FRAMES` (8) predictions:
+
+```
+Stability check:
+  stable_pred  = most frequent label in the last 8 frames
+  stable_count = how many of the 8 frames show stable_pred
+
+Accept condition:
+  stable_count == 8
+  AND time since last accepted letter >= 10 seconds
+  AND stable_pred NOT IN ["nothing", "del"]
+
+Delete condition:
+  stable_count == 8
+  AND time since last accepted letter >= 10 seconds
+  AND stable_pred == "del"
+```
+
+---
+
+## Model Details
+
+| Property | Value |
+|---|---|
+| Architecture | MobileViT-S |
+| Framework | PyTorch + timm |
+| Weights file | `mobilevit_epoch_5.pth` |
+| Training epochs | 5 |
+| Input resolution | 224 × 224 RGB |
+| Number of classes | 28 |
+| Classes | a–z (26 letters) + `del` + `nothing` |
+| Normalization | ImageNet mean/std (`[0.485, 0.456, 0.406]` / `[0.229, 0.224, 0.225]`) |
+| Inference device | CUDA (if available) or CPU |
+| Confidence output | Softmax probabilities |
+
+### Inference Pipeline
+
+```python
+image                           # PIL Image (RGB)
+  → Resize to 224×224
+  → ToTensor()                  # [0,1] float32 tensor
+  → Normalize (ImageNet)        # Standardized
+  → model(x)                    # Raw logits [1, 28]
+  → softmax(logits)             # Probabilities
+  → argmax → class label        # Predicted sign
+  → confidence = max probability
+```
+
+### Standalone Camera Script
+
+`run_mobilVit_camera.py` is a standalone script that runs the MobileViT model directly against your webcam using OpenCV — **no browser or web server required**. Useful for rapid model testing:
+
+```bash
+python run_mobilVit_camera.py
+```
+
+Press **Q** to quit. The overlay shows:
+- `Stable:` — current stable sign
+- `Text:` — accumulated word buffer
+- `Next letter in:` — cooldown countdown
+
+> ⚠️ This script uses `checkpoints_mobilevit/mobilevit_best.pth` (a different weight file path than the backend). Update the `MODEL_PATH` constant if needed.
+
+---
+
+## Supported Hand Signs & Dictionary
+
+### Detectable Signs (28 classes)
+
+```
+a  b  c  d  del  e  f  g  h  i  j  k  l  m
+n  nothing  o  p  q  r  s  t  u  v  w  x  y  z
+```
+
+- **a–z**: Spell any letter
+- **del**: Remove the last letter from the word being built
+- **nothing**: No active sign (hand at rest) — ignored by the system
+
+### Built-in Word Dictionary
+
+The spell checker includes 50 child-friendly words:
+
+```
+BAG, CAT, DOG, BIRD, FISH, BEAR, LION, TREE, BOOK, BALL, STAR,
+SUN, MOON, RAIN, SNOW, HAND, FOOT, HEAD, EYE, EAR, NOSE,
+APPLE, BANANA, ORANGE, GRAPE, WATER, MILK, BREAD, CAKE,
+HELLO, GOODBYE, PLEASE, THANKS, SORRY, HAPPY, SAD, LOVE,
+MOM, DAD, BABY, FRIEND, SCHOOL, HOME, PLAY, EAT, DRINK, SLEEP
+```
+
+### Spell-Check Logic
+
+The `useWordBuilder` hook implements a **Levenshtein distance** fuzzy matcher:
+
+```
+1. User clicks "Done"
+2. currentWord compared against DICTIONARY[]
+3. If exact match → result = "correct"
+4. If no match    → find word with minimum Levenshtein distance
+                  → result = "incorrect", show suggestion
+5. User clicks "Show Signs" → acceptCorrection()
+                             → iterate through each letter in suggestedWord
+                             → play /isl_videos/letters/<LETTER>.mp4
+```
+
+---
+
+## Frontend Components
+
+### `CameraPanel.tsx`
+Renders the live webcam feed, detection overlay, and the test keyboard.
+
+**Props:**
+| Prop | Type | Description |
+|---|---|---|
+| `currentLetter` | `string \| null` | Most recently detected letter |
+| `status` | `DetectionStatus` | `'idle' \| 'detecting' \| 'detected' \| 'error'` |
+| `statusMessage` | `string` | Human-readable status text |
+| `onSimulateDetection` | `(letter: string) => void` | Callback for test keyboard |
+| `videoRef` | `RefObject<HTMLVideoElement>` | Ref bound to the webcam `<video>` element |
+| `remainingTime` | `number` | Seconds remaining in cooldown |
+| `stablePrediction` | `string` | Current most-stable sign label |
+| `stableCount` | `number` | Frames matching the stable label (0–8) |
+| `isConnected` | `boolean` | WebSocket connection status |
+
+### `WordBuilder.tsx`
+Displays accumulated letters as animated bubbles with control buttons.
+
+**Props:** `letters`, `onClearWord`, `onCheckSpelling`, `onRemoveLetter`, `disabled`
+
+### `LetterBubble.tsx`
+An animated chip component used inside `WordBuilder` to display each detected letter.
+
+### `ResultDisplay.tsx`
+Conditionally renders the correct / incorrect result card with action buttons.
+
+**Props:** `result`, `currentWord`, `correctedWord`, `onTryAgain`, `onShowSign`, `onShowCorrectedSigns`
+
+### `SignViewer.tsx`
+A modal overlay for playing ISL sign videos.
+- **Word mode**: plays a single video from `/isl_videos/words/<WORD>.mp4`
+- **Letters mode**: plays letter videos one by one from `/isl_videos/letters/<LETTER>.mp4` with prev/next navigation
+
+### `useSignDetection` Hook
+Manages the entire WebSocket + webcam lifecycle:
+
+```typescript
+const {
+  currentLetter,      // Last accepted letter
+  status,             // Current detection state
+  statusMessage,      // UI-friendly status string
+  simulateDetection,  // Trigger a fake detection (test mode)
+  clearDetection,     // Reset current detection
+  videoRef,           // Attach to <video> element
+  remainingTime,      // Cooldown countdown (seconds)
+  stablePrediction,   // Most-voted sign in recent frames
+  stableCount,        // Stability counter (up to 8)
+  isConnected,        // WebSocket connected?
+  startDetection,     // Open webcam + connect WebSocket
+  stopDetection,      // Close webcam + WebSocket
+} = useSignDetection();
+```
+
+### `useWordBuilder` Hook
+Manages word state and spell checking:
+
+```typescript
+const {
+  letters,           // Array of accumulated letter strings
+  currentWord,       // Joined uppercase string
+  result,            // 'pending' | 'correct' | 'incorrect'
+  suggestedWord,     // Closest dictionary word (or null)
+  wordVideo,         // Path to word ISL video
+  letterVideos,      // Array of letter ISL video paths
+  addLetter,         // Append a letter
+  removeLetter,      // Remove last letter
+  clearWord,         // Reset everything
+  checkSpelling,     // Run spell check
+  acceptCorrection,  // Load letter videos for suggested word
+  resetResult,       // Back to pending state
+} = useWordBuilder();
+```
+
+---
+
+## Backend API Reference
+
+### REST Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Health check — returns server info and model name |
+| `GET` | `/health` | Lightweight health check |
+
+**`GET /` response:**
+```json
+{
+  "message": "Hand Sign Detection API",
+  "status": "running",
+  "device": "cuda",
+  "model": "MobileViT"
+}
+```
+
+### WebSocket Endpoint
+
+**`WS ws://localhost:8000/ws/detect`**
+
+#### Client → Server (send frame)
+```json
+{
+  "type": "frame",
+  "data": "data:image/jpeg;base64,<base64-encoded-image>"
+}
+```
+
+#### Client → Server (reset session)
+```json
+{
+  "type": "reset"
+}
+```
+
+#### Server → Client (prediction response)
+```json
+{
+  "type": "prediction",
+  "current_prediction": "a",
+  "stable_prediction": "a",
+  "stable_count": 6,
+  "confidence": 0.9821,
+  "remaining_time": 4,
+  "should_accept": false,
+  "should_delete": false,
+  "accepted_letter": "A",     // only present when should_accept is true
+  "text_buffer": "CA"         // only present when should_accept or should_delete
+}
+```
+
+#### Server → Client (reset confirmation)
+```json
+{
+  "type": "reset_complete"
+}
+```
+
+### Session Management
+
+Each WebSocket connection gets its own `DetectionSession` object:
+- Independent `prediction_queue` deque (last 8 predictions)
+- Independent `last_accept_time` (cooldown tracking)
+- Independent `text_buffer` (accumulated letters server-side)
+- Sessions are automatically cleaned up on disconnect
+
+---
+
+## Test Mode (No Backend Required)
+
+If the Python backend is not running, you can still test the word-building and spell-check features using the **on-screen test keyboard**:
+
+1. In the camera panel, find and click **"Show Test Keyboard"**
+2. A 26-letter keyboard grid appears
+3. Click any letter to simulate a detection event
+4. Letters are added directly to the word builder
+5. Spell check, viewing suggestions, and playing videos all work normally
+
+This is also useful for:
+- UI development without running the model
+- Debugging the frontend word-building logic
+- Demonstrating the app without camera hardware
+
+---
+
+## Troubleshooting
+
+### Backend Issues
+
+| Problem | Solution |
+|---|---|
+| `ModuleNotFoundError` | Run `pip install -r requirements.txt` |
+| `FileNotFoundError: mobilevit_epoch_5.pth` | Ensure the model file is in the project root |
+| `Class count mismatch` | Verify `class_order.txt` has exactly 28 lines |
+| `CUDA out of memory` | The model will auto-fall back to CPU; or reduce input resolution |
+| Port 8000 already in use | Change port: `uvicorn.run(app, host="0.0.0.0", port=8001)` and update `WS_URL` in the frontend hook |
+
+### Frontend Issues
+
+| Problem | Solution |
+|---|---|
+| `npm install` fails | Check Node.js version is ≥16; try `npm cache clean --force` |
+| `Failed to connect to WebSocket` | Start the backend server first; verify it's on port 8000 |
+| Camera not showing | Allow camera permissions in browser settings; ensure no other app is using the camera |
+| No letters being detected | Check lighting; make clear hand signs; hold sign steady for 8 frames; wait for cooldown |
+| Wrong port shown | Frontend typically uses 5173; check Vite output for actual URL |
+
+### Detection Quality Tips
+
+- 📦 **Good lighting** — avoid strong backlight; face a light source
+- ✋ **Clear signs** — keep only one hand in frame
+- 🖼️ **Fill the frame** — your hand should be large enough to see
+- 🧘 **Hold steady** — the model needs 8 matching frames (about 1.6 seconds at 5 fps)
+- ⏳ **Patience** — wait for the cooldown countdown before the next letter
+
+---
+
+## Security Notes
+
+> The default configuration is for **local development only**.
+
+For production deployment, update the following:
+
+```python
+# backend_server.py
+
+# ❌ Development (allow all origins)
+allow_origins=["*"]
+
+# ✅ Production (restrict to your domain)
+allow_origins=["https://yourdomain.com"]
+```
+
+Additional production hardening:
+- Use **HTTPS** and **WSS** (secure WebSocket) via a reverse proxy (nginx/Caddy)
+- Add **authentication middleware** to the FastAPI app
+- Implement **rate limiting** to prevent abuse
+- Validate and sanitize all incoming WebSocket messages
+- Store model weights securely; do not expose them in the public directory
+
+---
+
+## Dependencies
+
+### Python (`requirements.txt`)
+
+```
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+websockets==13.1
+torch==2.5.1
+torchvision==0.20.1
+timm==1.0.11
+opencv-python==4.10.0.84
+Pillow==11.1.0
+numpy==2.2.3
+python-multipart==0.0.20
+```
+
+### Node.js (key dependencies from `package.json`)
+
+```
+react@18.3.x
+react-router-dom@6.30.x
+@tanstack/react-query@5.83.x
+tailwindcss@3.4.x
+vite@5.4.x
+typescript@5.8.x
+shadcn/ui (via @radix-ui/*)
+lucide-react@0.462.x
+```
+
+---
+
+## License
+
+This project uses the following open-source software:
+
+| Library | License |
+|---|---|
+| FastAPI | MIT |
+| React | MIT |
+| PyTorch | BSD-3-Clause |
+| timm (MobileViT) | Apache 2.0 |
+| OpenCV | Apache 2.0 |
+| Radix UI / shadcn | MIT |
+| Tailwind CSS | MIT |
+| Vite | MIT |
+
+---
+
+<div align="center">
+
+**Happy Signing!** 🤟✨
+
+*Built with ❤️ for deaf learners everywhere*
+
+</div>

@@ -27,7 +27,7 @@ const SignViewer = ({
   const [videoKey, setVideoKey] = useState(0);
 
   useEffect(() => {
-    setCurrentIndex(0); // reset when opened
+    setCurrentIndex(0);
     setVideoKey(prev => prev + 1);
   }, [isOpen]);
 
@@ -46,7 +46,6 @@ const SignViewer = ({
   };
 
   const handleReplay = () => {
-    // For word mode, replay the same video; for letters mode, go back to first letter
     if (mode === "word") {
       setVideoKey(prev => prev + 1);
     } else {
@@ -55,32 +54,34 @@ const SignViewer = ({
     }
   };
 
-  const videoSrc =
-    mode === "word"
-      ? wordVideo
-      : letterVideos[currentIndex];
+  const videoSrc = mode === "word" ? wordVideo : letterVideos[currentIndex];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm">
-      <div className="bg-card rounded-3xl p-4 shadow-2xl border-4 border-primary w-full max-w-sm animate-pop-in max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm">
+      <div className="bg-card rounded-xl border border-border shadow-lift w-full max-w-sm animate-pop-in max-h-[90vh] flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <h3 className="text-lg font-extrabold text-foreground">
-            {mode === "word"
-              ? `Sign for "${word}"`
-              : `Letter: ${letters[currentIndex]}`}
-          </h3>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+          <div>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              {mode === "word" ? "Sign Language" : `Letter ${currentIndex + 1} of ${letters.length}`}
+            </p>
+            <h3 className="text-sm font-bold text-foreground leading-tight">
+              {mode === "word"
+                ? `Sign for "${word}"`
+                : `Letter: ${letters[currentIndex]}`}
+            </h3>
+          </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors text-muted-foreground"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Video Display - 16:9 aspect ratio */}
-        <div className="aspect-video bg-black rounded-xl border-2 border-camera-border flex items-center justify-center mb-3 overflow-hidden flex-shrink-0">
+        {/* Video */}
+        <div className="aspect-video bg-black flex items-center justify-center flex-shrink-0 overflow-hidden">
           {videoSrc ? (
             <video
               key={`${videoSrc}-${videoKey}`}
@@ -90,67 +91,64 @@ const SignViewer = ({
               className="w-full h-full object-contain"
             />
           ) : (
-            <p className="text-muted-foreground text-sm">No sign available</p>
+            <p className="text-muted-foreground text-xs">No sign video available</p>
           )}
         </div>
 
-        {/* Letter Navigation */}
+        {/* Letter navigation chips */}
         {mode === "letters" && letterVideos.length > 1 && (
-          <div className="flex items-center justify-center gap-2 mb-3 flex-shrink-0 flex-wrap">
-            <Button
+          <div className="flex items-center justify-center gap-2 px-4 py-2.5 border-t border-border flex-shrink-0 bg-muted/30">
+            <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              variant="outline"
-              size="sm"
-              className="rounded-full w-10 h-10"
+              className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
-            </Button>
+            </button>
 
             <div className="flex gap-1 flex-wrap justify-center">
               {letters.map((letter, idx) => (
-                <div
+                <button
                   key={idx}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs transition-colors
                     ${idx === currentIndex
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }
                   `}
                 >
                   {letter}
-                </div>
+                </button>
               ))}
             </div>
 
-            <Button
+            <button
               onClick={handleNext}
               disabled={currentIndex === letterVideos.length - 1}
-              variant="outline"
-              size="sm"
-              className="rounded-full w-10 h-10"
+              className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-2 flex-shrink-0">
+        {/* Footer actions */}
+        <div className="flex gap-2 p-3 border-t border-border flex-shrink-0">
           <Button
             onClick={handleReplay}
             variant="outline"
-            size="default"
-            className="flex-1 h-10 text-sm font-bold rounded-xl gap-2"
+            size="sm"
+            className="flex-1 h-8 text-xs font-semibold rounded-lg gap-1.5"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
             Replay
           </Button>
 
           <Button
             onClick={onClose}
-            size="default"
-            className="flex-1 h-10 text-sm font-bold rounded-xl gap-2 bg-success hover:bg-success/90 text-success-foreground"
+            size="sm"
+            className="flex-1 h-8 text-xs font-semibold rounded-lg gap-1.5 bg-success hover:bg-success/90 text-success-foreground"
           >
             Got it!
           </Button>

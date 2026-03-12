@@ -8,21 +8,21 @@ interface UseWordBuilderReturn {
   letters: string[];
   currentWord: string;
   result: SpellingResult;
-  suggestedWord: string | null;
+  suggestedWords: string[];
   wordVideo: string | null;
   letterVideos: string[];
   addLetter: (letter: string) => void;
   removeLetter: () => void;
   clearWord: () => void;
   checkSpelling: () => void;
-  acceptCorrection: () => void;
+  acceptCorrection: (word: string) => void;
   resetResult: () => void;
 }
 
 /* ---------------- DICTIONARY ---------------- */
 
-const DICTIONARY = [
-  "CAT", "DOG", "BIRD", "FISH", "BEAR", "LION", "TREE", "BOOK", "BALL", "STAR",
+export const DICTIONARY = [
+   "BAG","CAT", "DOG", "BIRD", "FISH", "BEAR", "LION", "TREE", "BOOK", "BALL", "STAR",
   "SUN", "MOON", "RAIN", "SNOW", "HAND", "FOOT", "HEAD", "EYE", "EAR", "NOSE",
   "APPLE", "BANANA", "ORANGE", "GRAPE", "WATER", "MILK", "BREAD", "CAKE",
   "HELLO", "GOODBYE", "PLEASE", "THANKS", "SORRY", "HAPPY", "SAD", "LOVE",
@@ -61,19 +61,18 @@ const levenshteinDistance = (a: string, b: string): number => {
   return dp[a.length][b.length];
 };
 
-const findClosestWord = (word: string): string => {
-  let minDist = Infinity;
-  let closest = DICTIONARY[0];
+const findClosestWords = (word: string, count: number = 3): string[] => {
+  // Calculate distance for all words
+  const distances = DICTIONARY.map(dictWord => ({
+    word: dictWord,
+    distance: levenshteinDistance(word, dictWord)
+  }));
 
-  for (const dictWord of DICTIONARY) {
-    const dist = levenshteinDistance(word, dictWord);
-    if (dist < minDist) {
-      minDist = dist;
-      closest = dictWord;
-    }
-  }
+  // Sort by closest distance
+  distances.sort((a, b) => a.distance - b.distance);
 
-  return closest;
+  // Return the top `count` closest words
+  return distances.slice(0, count).map(d => d.word);
 };
 
 /* ---------------- HOOK ---------------- */
@@ -81,7 +80,7 @@ const findClosestWord = (word: string): string => {
 export const useWordBuilder = (): UseWordBuilderReturn => {
   const [letters, setLetters] = useState<string[]>([]);
   const [result, setResult] = useState<SpellingResult>("pending");
-  const [suggestedWord, setSuggestedWord] = useState<string | null>(null);
+  const [suggestedWords, setSuggestedWords] = useState<string[]>([]);
   const [wordVideo, setWordVideo] = useState<string | null>(null);
   const [letterVideos, setLetterVideos] = useState<string[]>([]);
 
@@ -90,7 +89,7 @@ export const useWordBuilder = (): UseWordBuilderReturn => {
   const addLetter = useCallback((letter: string) => {
     setLetters(prev => [...prev, letter.toUpperCase()]);
     setResult("pending");
-    setSuggestedWord(null);
+    setSuggestedWords([]);
     setWordVideo(null);
     setLetterVideos([]);
   }, []);
@@ -98,7 +97,7 @@ export const useWordBuilder = (): UseWordBuilderReturn => {
   const removeLetter = useCallback(() => {
     setLetters(prev => prev.slice(0, -1));
     setResult("pending");
-    setSuggestedWord(null);
+    setSuggestedWords([]);
     setWordVideo(null);
     setLetterVideos([]);
   }, []);
@@ -106,7 +105,7 @@ export const useWordBuilder = (): UseWordBuilderReturn => {
   const clearWord = useCallback(() => {
     setLetters([]);
     setResult("pending");
-    setSuggestedWord(null);
+    setSuggestedWords([]);
     setWordVideo(null);
     setLetterVideos([]);
   }, []);
@@ -114,32 +113,30 @@ export const useWordBuilder = (): UseWordBuilderReturn => {
   const checkSpelling = useCallback(() => {
     if (!currentWord) return;
 
-    // ✅ Case 1: Correct word
+    // 🎮 Dictionary Match
     if (DICTIONARY.includes(currentWord)) {
       setResult("correct");
       setWordVideo(`${WORD_VIDEO_PATH}${currentWord}.mp4`);
       return;
     }
 
-    // ❌ Case 2: Incorrect → find closest
-    const closest = findClosestWord(currentWord);
+    // ❌ Incorrect → find top 3 closest using Levenshtein distance
+    const closestWords = findClosestWords(currentWord);
     setResult("incorrect");
-    setSuggestedWord(closest);
+    setSuggestedWords(closestWords);
   }, [currentWord]);
 
-  // User accepts suggested word → show LETTER signs
-  const acceptCorrection = useCallback(() => {
-    if (!suggestedWord) return;
-
-    const videos = suggestedWord.split("").map(
+  // User selects one of the suggested words → show LETTER signs for that word
+  const acceptCorrection = useCallback((word: string) => {
+    const videos = word.split("").map(
       letter => `${LETTER_VIDEO_PATH}${letter}.mp4`
     );
     setLetterVideos(videos);
-  }, [suggestedWord]);
+  }, []);
 
   const resetResult = useCallback(() => {
     setResult("pending");
-    setSuggestedWord(null);
+    setSuggestedWords([]);
     setWordVideo(null);
     setLetterVideos([]);
   }, []);
@@ -148,7 +145,7 @@ export const useWordBuilder = (): UseWordBuilderReturn => {
     letters,
     currentWord,
     result,
-    suggestedWord,
+    suggestedWords,
     wordVideo,
     letterVideos,
     addLetter,
