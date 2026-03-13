@@ -202,7 +202,7 @@ const Index = () => {
                       <Trophy className="w-12 h-12 text-accent" />
                     </div>
                     <h2 className="text-3xl font-extrabold text-foreground mb-2">Challenge Complete!</h2>
-                    <p className="text-muted-foreground font-medium mb-8">You spelled all {testSession.totalWords} words.</p>
+                    <p className="text-muted-foreground font-medium mb-8">You spelled {testSession.totalWords} valid words.</p>
                     
                     <div className="bg-background rounded-2xl p-6 border border-border shadow-inner w-full max-w-sm mb-8">
                       <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Score</p>
@@ -215,7 +215,7 @@ const Index = () => {
                         {[...Array(5)].map((_, i) => (
                           <Star 
                             key={i} 
-                            className={`w-6 h-6 ${i < (testSession.score / testSession.maxScore) * 5 ? 'text-accent fill-accent' : 'text-muted fill-muted'} transition-all`} 
+                            className={`w-6 h-6 ${i < (testSession.score / (testSession.maxScore / 5)) ? 'text-accent fill-accent' : 'text-muted fill-muted'} transition-all`} 
                           />
                         ))}
                       </div>
@@ -244,6 +244,55 @@ const Index = () => {
                         Play Again!
                       </Button>
                     </div>
+                  </div>
+                </div>
+              ) : testSession.showInstructions ? (
+                // 📜 Scoring Instructions Screen
+                <div className="bg-card rounded-2xl border border-border shadow-lift overflow-hidden h-full flex flex-col items-center justify-center p-8 text-center animate-slide-up relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5" />
+                  <div className="relative z-10 flex flex-col items-center max-w-md mx-auto">
+                    <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mb-6 shadow-glow">
+                      <Trophy className="w-10 h-10 text-primary" />
+                    </div>
+                    <h2 className="text-3xl font-extrabold text-foreground mb-3">How to Play</h2>
+                    
+                    <div className="bg-background rounded-2xl p-6 border border-border shadow-inner w-full mb-8 text-left space-y-5">
+                      <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="font-bold text-primary">1</span>
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground flex-1 leading-relaxed">
+                          Sign <strong className="text-foreground">ANY</strong> 5 valid dictionary words of your choice to complete the challenge.
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                          <span className="font-bold text-success text-[11px]">100</span>
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground flex-1 leading-relaxed">
+                          Get <strong className="text-success">100 points</strong> for spelling a word perfectly on your very first try!
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                          <span className="font-bold text-warning text-[11px]">50</span>
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground flex-1 leading-relaxed">
+                          Need help? We'll suggest corrections if you make a mistake. Click a suggestion to fix it for <strong className="text-warning">50 points</strong>!
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={() => {
+                        testSession.beginTest();
+                        handleTryAgain(); // ensure board is clear
+                      }}
+                      className="w-full h-12 text-base font-bold rounded-xl bg-primary hover:bg-primary/90 shadow-sm transition-transform hover:scale-[1.02]"
+                    >
+                      <Gamepad2 className="w-5 h-5 mr-2" />
+                      Let's Go!
+                    </Button>
                   </div>
                 </div>
               ) : (

@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 
 export interface TestSessionState {
   isActive: boolean;
+  showInstructions: boolean;
   wordsCompleted: number;
   score: number;
   attemptsForCurrent: number;
@@ -15,6 +16,7 @@ const POINTS_RETRY = 50;
 export const useTestSession = () => {
   const [session, setSession] = useState<TestSessionState>({
     isActive: false,
+    showInstructions: false,
     wordsCompleted: 0,
     score: 0,
     attemptsForCurrent: 0,
@@ -24,11 +26,19 @@ export const useTestSession = () => {
   const startTest = useCallback(() => {
     setSession({
       isActive: true,
+      showInstructions: true,
       wordsCompleted: 0,
       score: 0,
       attemptsForCurrent: 0,
       isComplete: false,
     });
+  }, []);
+
+  const beginTest = useCallback(() => {
+    setSession((prev) => ({
+      ...prev,
+      showInstructions: false,
+    }));
   }, []);
 
   const recordAttempt = useCallback((isCorrect: boolean) => {
@@ -74,6 +84,7 @@ export const useTestSession = () => {
   const quitTest = useCallback(() => {
     setSession({
       isActive: false,
+      showInstructions: false,
       wordsCompleted: 0,
       score: 0,
       attemptsForCurrent: 0,
@@ -84,6 +95,7 @@ export const useTestSession = () => {
   return {
     ...session,
     startTest,
+    beginTest,
     recordAttempt,
     nextWord,
     quitTest,
