@@ -24,7 +24,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_CLASSES = 28
 MODEL_PATH = "mobilevit_epoch_5.pth"  # Updated to correct path
 CLASS_FILE = "class_order.txt"
-PRED_INTERVAL = 10  # seconds between character capture
+PRED_INTERVAL = 5  # seconds between character capture
 STABILITY_FRAMES = 8  # frames needed for stable prediction
 
 # ---------------- LOAD CLASSES ----------------

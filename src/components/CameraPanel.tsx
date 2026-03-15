@@ -12,6 +12,7 @@ interface CameraPanelProps {
   stablePrediction?: string;
   stableCount?: number;
   isConnected?: boolean;
+  isPaused?: boolean;
 }
 
 const CameraPanel = ({ 
@@ -23,7 +24,8 @@ const CameraPanel = ({
   remainingTime = 0,
   stablePrediction,
   stableCount = 0,
-  isConnected = false
+  isConnected = false,
+  isPaused = false
 }: CameraPanelProps) => {
   const [showKeyboard, setShowKeyboard] = useState(false);
 
@@ -42,23 +44,28 @@ const CameraPanel = ({
           <div
             className={`
               w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300 font-bold text-sm
-              ${currentLetter
-                ? 'bg-primary text-primary-foreground shadow-glow animate-celebrate'
-                : 'bg-muted text-muted-foreground'
+              ${isPaused 
+                ? 'bg-muted text-muted-foreground'
+                : currentLetter
+                  ? 'bg-primary text-primary-foreground shadow-glow animate-celebrate'
+                  : 'bg-muted text-muted-foreground'
               }
             `}
           >
-            {currentLetter || '–'}
+            {isPaused ? '⏸️' : (currentLetter || '–')}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-xs font-semibold truncate transition-colors ${status === 'detected' ? 'text-success' : 'text-foreground'}`}>
-              {statusMessage}
+            <p className={`text-xs font-semibold truncate transition-colors ${!isPaused && status === 'detected' ? 'text-success' : 'text-foreground'}`}>
+              {isPaused ? 'Looking for signs...' : statusMessage}
             </p>
-            {status === 'idle' && (
+            {(!isPaused && status === 'idle') && (
               <p className="text-[10px] text-muted-foreground leading-tight">Make a hand sign in front of the camera</p>
             )}
+            {isPaused && (
+              <p className="text-[10px] text-muted-foreground leading-tight">Detection paused while checking</p>
+            )}
           </div>
-          {remainingTime > 0 && (
+          {!isPaused && remainingTime > 0 && (
             <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md flex-shrink-0">
               {remainingTime}s
             </span>

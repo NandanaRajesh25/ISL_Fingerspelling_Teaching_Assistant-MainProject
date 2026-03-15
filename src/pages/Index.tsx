@@ -48,6 +48,11 @@ const Index = () => {
 
   // Add detected letter to word builder
   useEffect(() => {
+    // 🛑 Pause detection if a word is currently being checked or if the test is showing instructions/scorecard
+    if (result !== 'pending' || testSession.showInstructions || testSession.isComplete) {
+      return;
+    }
+
     if (status === 'detected' && currentLetter) {
       if (currentLetter === 'DEL') {
         removeLetter();
@@ -59,7 +64,16 @@ const Index = () => {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [status, currentLetter, addLetter, removeLetter, clearDetection]);
+  }, [
+    status, 
+    currentLetter, 
+    addLetter, 
+    removeLetter, 
+    clearDetection, 
+    result, 
+    testSession.showInstructions, 
+    testSession.isComplete
+  ]);
 
   const handleCheckSpelling = () => {
     checkSpelling(); // In both modes, we just check against the dictionary
@@ -187,6 +201,7 @@ const Index = () => {
                 stablePrediction={stablePrediction}
                 stableCount={stableCount}
                 isConnected={isConnected}
+                isPaused={result !== 'pending' || testSession.showInstructions || testSession.isComplete}
               />
             </section>
 
